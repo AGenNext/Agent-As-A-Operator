@@ -21,7 +21,9 @@ deploy/
   deployment.yaml       # K8s manifest
 flux/
   kustomization.yaml   # Flux GitOps
-skills/                 # Skills
+skills/
+  gitops.md            # Flux CD skill
+  semantic-validation.md  # K8s validation
 ```
 
 ## Flux CD (CNCF)
