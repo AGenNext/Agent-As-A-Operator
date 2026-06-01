@@ -1,0 +1,140 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: headlamp-ai
+  labels:
+    app.kubernetes.io/name: pod-manager
+    app.kubernetes.io/component: ai-assistant
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pod-manager-config
+  namespace: headlamp-ai
+data:
+  LOG_LEVEL: "INFO"
+  KUBERNETES_MODE: "in-cluster"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-manager
+  namespace: headlamp-ai
+  labels:
+    app: pod-manager
+    component: ai-assistant
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pod-manager
+  template:
+    metadata:
+      labels:
+        app: pod-manager
+        component: ai-assistant
+    spec:
+      serviceAccountName: pod-manager-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: pod-manager
+          image: ghcr.io/headlamp-k8s/plugins/pod-manager:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: pod-manager-config
+          env:
+            - name: HEADLAMP_CURRENT_CLUSTER
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.clusterName
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pod-manager
+  namespace: headlamp-ai
+  labels:
+    app: pod-manager
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: pod-manager
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pod-manager-sa
+  namespace: headlamp-ai
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-manager-role
+  namespace: headlamp-ai
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-manager-rb
+  namespace: headlamp-ai
+subjects:
+  - kind: ServiceAccount
+    name: pod-manager-sa
+    namespace: headlamp-ai
+roleRef:
+  kind: Role
+  name: pod-manager-role
+  apiGroup: rbac.authorization.k8s.io

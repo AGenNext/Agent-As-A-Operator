@@ -1,0 +1,273 @@
+# Headlamp AI Stack Builder
+# Deploys the complete AI Assistant stack to Kubernetes
+
+---
+# Namespace for the entire stack
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: headlamp
+  labels:
+    app.kubernetes.io/name: headlamp-ai
+    app.kubernetes.io/component: stack
+
+---
+# ConfigMap with stack configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: headlamp-stack-config
+  namespace: headlamp
+data:
+  STACK_VERSION: "1.0.0"
+  AI_PROVIDER: "openai"
+  LOG_LEVEL: "info"
+  ENABLE_MCP: "true"
+  MCP_SERVERS: "flux,prometheus"
+
+---
+# Pod Manager Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-manager
+  namespace: headlamp
+  labels:
+    app: pod-manager
+    tier: ai
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pod-manager
+  template:
+    metadata:
+      labels:
+        app: pod-manager
+        tier: ai
+    spec:
+      serviceAccountName: pod-manager
+      containers:
+        - name: pod-manager
+          image: ghcr.io/headlamp-k8s/plugins/pod-manager:latest
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: headlamp-stack-config
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+
+---
+# Service for Pod Manager
+apiVersion: v1
+kind: Service
+metadata:
+  name: pod-manager
+  namespace: headlamp
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: pod-manager
+
+---
+# MCP Server (Flux Operator)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flux-mcp-server
+  namespace: headlamp
+  labels:
+    app: flux-mcp-server
+    tier: mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flux-mcp-server
+  template:
+    metadata:
+      labels:
+        app: flux-mcp-server
+        tier: mcp
+    spec:
+      containers:
+        - name: flux-mcp
+          image: ghcr.io/fluxcd/flux-operator-mcp:latest
+          ports:
+            - containerPort: 8081
+          env:
+            - name: KUBECONFIG
+              value: /var/run/secrets/kubernetes.io/serviceaccount/token
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+---
+# MCP Server Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: flux-mcp-server
+  namespace: headlamp
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8081
+      targetPort: 8081
+  selector:
+    app: flux-mcp-server
+
+---
+# Prometheus MCP Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-mcp-server
+  namespace: headlamp
+  labels:
+    app: prometheus-mcp-server
+    tier: mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-mcp-server
+  template:
+    metadata:
+      labels:
+        app: prometheus-mcp-server
+        tier: mcp
+    spec:
+      containers:
+        - name: prometheus-mcp
+          image: ghcr.io/prometheus-community/prometheus-mcp:latest
+          ports:
+            - containerPort: 8082
+          env:
+            - name: PROMETHEUS_URL
+              value: "http://prometheus.monitoring:9090"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+---
+# Prometheus MCP Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-mcp-server
+  namespace: headlamp
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8082
+      targetPort: 8082
+  selector:
+    app: prometheus-mcp-server
+
+---
+# ServiceAccount for Pod Manager
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pod-manager
+  namespace: headlamp
+
+---
+# RBAC Role for Pod Manager
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-manager
+  namespace: headlamp
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec", "services", "configmaps"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["namespaces", "nodes"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["monitoring.coreos.com"]
+    resources: ["prometheuses", "servicemonitors"]
+    verbs: ["get", "list"]
+
+---
+# RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-manager
+  namespace: headlamp
+subjects:
+  - kind: ServiceAccount
+    name: pod-manager
+    namespace: headlamp
+roleRef:
+  kind: Role
+  name: pod-manager
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Network Policy - restrict egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pod-manager-netpol
+  namespace: headlamp
+spec:
+  podSelector:
+    matchLabels:
+      app: pod-manager
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: headlamp
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
