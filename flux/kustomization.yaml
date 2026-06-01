@@ -1,0 +1,55 @@
+# Flux GitOps Toolkit - CNCF Standard
+# Deploys Luna agent from source repository
+
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: luna-agent
+  namespace: flux-system
+spec:
+  interval: 1m
+  url: https://github.com/AGenNext/Operator-Agents
+  ref:
+    branch: main
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: luna-agent
+  namespace: flux-system
+spec:
+  interval: 5m
+  path: ./deploy
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: luna-agent
+  targetNamespace: headlamp
+  createNamespace: true
+---
+# HelmRelease for pod-manager
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: pod-manager
+  namespace: headlamp
+spec:
+  interval: 10m
+  chart:
+    spec:
+      chart: pod-manager
+      version: ">=1.0.0"
+      sourceRef:
+        kind: HelmRepository
+        name: pod-manager-charts
+  values:
+    replicaCount: 2
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: pod-manager-charts
+  namespace: flux-system
+spec:
+  interval: 5m
+  url: https://AGenNext.github.io/charts
