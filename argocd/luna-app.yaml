@@ -1,0 +1,50 @@
+# ArgoCD Application for Luna Agent - Headlamp Pod Manager
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: luna-agent-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: luna-agent
+    app.kubernetes.io/component: operator-agent
+    agent.luna/managed: "true"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  source:
+    repoURL: https://github.com/AGenNext/Operator-Agents.git
+    targetRevision: main
+    path: deploy
+    directory:
+      recurse: true
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: headlamp
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagation=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+  
+  revisionHistoryLimit: 10

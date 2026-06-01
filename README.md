@@ -3,6 +3,8 @@
 > 🤖 Agents who can operate tools - Kubernetes, GitOps, and Cloud Native operations
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![ArgoCD](https://img.shields.io/badge/ArgoCD-EF7B4D?style=for-the-badge&logo=argo)](https://argoproj.github.io/)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-326ce5?style=for-the-badge&logo=kubernetes)](https://kubernetes.io/)
 
 ## Overview
 
@@ -24,31 +26,7 @@ This repository contains **Operator Agents** - AI agents designed to operate too
 └────────────────────────────────────────────────────────────┘
 ```
 
-## Agents
-
-### 🌙 Luna - Headlamp AI Pod Manager
-
-**Type:** File-based OpenHands agent  
-**Purpose:** Kubernetes pod management with GitOps support
-
-#### Capabilities
-- **Kubernetes Operations**: Pod management, deployments, services
-- **GitOps**: Flux CD, ArgoCD, Helm, Kustomize
-- **MCP Integration**: Flux MCP, Prometheus MCP servers
-- **CI/CD**: GitHub Actions pipeline with SBOM
-- **IaC**: Terraform configuration
-
-#### Skills
-| Skill | Description |
-|-------|-------------|
-| `kubernetes` | Cluster management, kubectl operations |
-| `gitops` | Flux CD, ArgoCD, Helm workflows |
-| `semantic-validation` | K8s manifest validation |
-| `github` | GitHub integration, PRs |
-| `docker` | Container image management |
-| `security` | Secure practices, API key handling |
-
-#### Quick Start
+## Quick Start
 
 ```bash
 # One-command K3s deployment
@@ -57,6 +35,35 @@ curl -sSL https://raw.githubusercontent.com/AGenNext/Operator-Agents/main/deploy
 # Deploy with options
 NAMESPACE=production REPLICAS=3 AI_PROVIDER=azure bash deploy.sh
 ```
+
+## Agent Registry
+
+| Agent | Type | Purpose |
+|-------|------|---------|
+| 🌙 **Luna** | Operator | Kubernetes pod management & GitOps |
+
+### 🌙 Luna - Headlamp AI Pod Manager
+
+**Type:** File-based OpenHands agent  
+**Purpose:** Kubernetes pod management with GitOps support
+
+```yaml
+name: Luna
+role: Headlamp AI Companion & DevOps Guide
+skills: kubernetes, gitops, security, docker, github, semantic-validation
+providers: openai, azure, anthropic, deepseek, ollama
+```
+
+#### Capabilities
+
+| Capability | Description |
+|------------|-------------|
+| ☸ Kubernetes | Pod management, deployments, services |
+| 🔄 GitOps | Flux CD, ArgoCD, Helm, Kustomize |
+| 🛡️ Security | RBAC, NetworkPolicy, secure defaults |
+| 📦 Docker | Multi-arch container builds |
+| 🔍 Validation | K8s manifest validation |
+| 🐙 GitHub | PR management, CI/CD |
 
 #### Stack Components
 
@@ -67,10 +74,71 @@ headlamp namespace
 └── prometheus-mcp-server # Metrics MCP server
 ```
 
+## Deployment Options
+
+| Method | Command | Use Case |
+|--------|---------|----------|
+| One-liner | `curl -sSL .../deploy.sh \| bash` | Quick start |
+| Raw K8s | `kubectl apply -f deploy/deployment.yaml` | Custom |
+| StackBuilder | `kubectl apply -f deploy/stack.yaml` | Full stack |
+| Helm | `helm install pod-manager oci://...` | Production |
+| Terraform | `terraform apply` | IaC |
+| ArgoCD | See [ArgoCD Sync](#argocd-sync) | GitOps |
+
+## ArgoCD Sync
+
+Sync Luna agent configuration across multiple repositories:
+
+```bash
+# Apply ArgoCD App-of-Apps
+kubectl apply -f argocd/app-of-apps.yaml
+
+# Or deploy directly
+kubectl apply -f argocd/luna-app.yaml
+```
+
+### Multi-Repo Sync Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    ArgoCD                                  │
+│                  (Control Plane)                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  App-of-Apps ──────────────────────────────────────┐       │
+│       │                                           │       │
+│       ▼                                           ▼       │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐   │
+│  │ Agent-Services│   │ DevOps      │    │ Operator-  │   │
+│  │ AGENTS.md   │    │ AGENTS.md   │    │ Agents     │   │
+│  └─────────────┘    └─────────────┘    │ (source)   │   │
+│                                        └─────────────┘   │
+│                                             ▲             │
+│                                             │             │
+│                                     ┌───────────────┐    │
+│                                     │ headlamp-k8s/ │    │
+│                                     │ plugins       │    │
+│                                     └───────────────┘    │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Target Repositories
+
+| Repository | Content | Branch |
+|------------|----------|--------|
+| `AGenNext/Operator-Agents` | Source agent definition | `main` |
+| `AGenNext/Agent-Services` | AI provider integration | `main` |
+| `AGenNext/AGenNext-DevOps` | DevOps capabilities | `main` |
+| `headlamp-k8s/plugins` | Headlamp plugin | `feature/pod-manager-agent` |
+
 ## Project Structure
 
 ```
 Operator-Agents/
+├── README.md                           # This file
+├── AGENT_CARD.md                       # Agent card (JSON, HTML)
+├── CARD.md                            # Visual card with badges
 ├── agents/
 │   └── luna/
 │       └── headlamp-ai-assistant.md    # Luna agent definition
@@ -84,21 +152,15 @@ Operator-Agents/
 │   └── stack.yaml                     # StackBuilder manifest
 ├── e2e/
 │   ├── run-tests.sh                   # Bash E2E tests
-│   ├── argocd/                        # ArgoCD tests
-│   └── terraform/                     # IaC tests
+│   ├── main.tf                        # Terraform
+│   └── argocd-app.yaml               # ArgoCD app
+├── argocd/
+│   ├── app-of-apps.yaml              # App-of-Apps pattern
+│   ├── luna-app.yaml                # Luna agent app
+│   └── agents-app.yaml              # Multi-agent app
 ├── Dockerfile                         # Container build
 └── requirements.txt                   # Python dependencies
 ```
-
-## Deployment Options
-
-| Method | Command | Use Case |
-|--------|---------|----------|
-| One-liner | `curl -sSL .../deploy.sh \| bash` | Quick start |
-| Raw K8s | `kubectl apply -f deployment.yaml` | Custom |
-| Helm | `helm install pod-manager oci://...` | Production |
-| StackBuilder | `kubectl apply -f stack.yaml` | Full stack |
-| Terraform | `terraform apply` | IaC |
 
 ## Configuration
 
@@ -133,6 +195,15 @@ Operator-Agents/
 ./e2e/terraform/run-terraform-tests.sh
 ```
 
+## CI/CD Pipeline
+
+GitHub Actions workflow:
+1. Multi-arch build (amd64, arm64)
+2. Push to GHCR
+3. SBOM generation (SPDX-JSON)
+4. Helm chart packaging
+5. E2E tests on kind cluster
+
 ## Security
 
 - Non-root container (user 1000)
@@ -141,15 +212,6 @@ Operator-Agents/
 - Capabilities dropped (ALL)
 - NetworkPolicy restrictions
 - RBAC least-privilege
-
-## CI/CD
-
-GitHub Actions workflow:
-1. Multi-arch build (amd64, arm64)
-2. Push to GHCR
-3. SBOM generation (SPDX-JSON)
-4. Helm chart packaging
-5. E2E tests on kind cluster
 
 ## Contributing
 

@@ -1,0 +1,37 @@
+# ArgoCD App-of-Apps for Luna Agent
+# This pattern manages multiple applications from a single source
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: luna-agent-root
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: luna-agent
+    app.kubernetes.io/component: app-of-apps
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  source:
+    repoURL: https://github.com/AGenNext/Operator-Agents.git
+    targetRevision: main
+    path: argocd
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+  
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      jsonPointers:
+        - /spec/source/repoURL

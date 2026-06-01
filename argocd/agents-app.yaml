@@ -1,0 +1,82 @@
+# ArgoCD Application for Multi-Repo Agent Sync
+# This syncs Luna agent configuration to all target repositories
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: luna-agent-sync
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: luna-agent
+    app.kubernetes.io/component: sync
+    agent.luna/managed: "true"
+spec:
+  project: default
+  
+  source:
+    repoURL: https://github.com/AGenNext/Operator-Agents.git
+    targetRevision: main
+    path: manifests
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
+---
+# ApplicationSet for multi-repo sync (when using ArgoCD ApplicationSet)
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: luna-agent-repos
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - repo: AGenNext/Agent-Services
+            url: https://github.com/AGenNext/Agent-Services
+            path: agents/luna
+            branch: main
+          - repo: AGenNext/AGenNext-DevOps
+            url: https://github.com/AGenNext/AGenNext-DevOps
+            path: agents/luna
+            branch: main
+          - repo: headlamp-k8s/plugins
+            url: https://github.com/headlamp-k8s/plugins
+            path: ai-assistant/agents
+            branch: main
+  
+  template:
+    metadata:
+      name: luna-agent-{{repo}}
+      labels:
+        agent.luna/synced: "true"
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/AGenNext/Operator-Agents.git
+        targetRevision: main
+        path: agents/luna
+        kustomize:
+          images:
+            - ghcr.io/headlamp-k8s/plugins/pod-manager:*
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: agent-registry
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+      ignoreDifferences:
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+            - /spec/replicas
