@@ -17,6 +17,10 @@ tools:
   - browser_get_state
   - browser_click
   - browser_type
+  - browser_scroll
+  - browser_go_back
+  - browser_get_storage
+  - browser_set_storage
 model: inherit
 skills:
   - kubernetes
