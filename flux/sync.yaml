@@ -1,0 +1,48 @@
+# Flux Multi-Tenant Sync for Luna Agent
+# Syncs agent configuration to multiple repositories
+
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: luna-agent-sync
+  namespace: flux-system
+spec:
+  interval: 5m
+  path: ./sync
+  prune: false
+  sourceRef:
+    kind: GitRepository
+    name: luna-agent-source
+
+---
+# ImagePolicy for Luna agent container
+# Updates when new images are pushed to GHCR
+
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: luna-agent
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: pod-manager
+    namespace: flux-system
+  policy:
+    semver:
+      range: ">=1.0.0"
+
+---
+# ImageRepository for pod-manager
+
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: pod-manager
+  namespace: flux-system
+spec:
+  image: ghcr.io/headlamp-k8s/plugins/pod-manager
+  interval: 1m
+  secretRef:
+    name: ghcr-credentials
+  source:
+    sourceController: true

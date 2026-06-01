@@ -1,0 +1,62 @@
+# Flux CD GitRepository - Source for Luna Agent
+# Monitors the Operator-Agents repository for updates
+
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: luna-agent-source
+  namespace: flux-system
+spec:
+  interval: 1m
+  url: https://github.com/AGenNext/Operator-Agents
+  ref:
+    branch: main
+  secretRef:
+    name: flux-agent-token
+  ignore: |
+    # Exclude workflow files
+    .github/**
+    # Exclude documentation
+    README*.md
+    CARD.md
+    AGENT_CARD.md
+
+---
+# Kustomization for Luna Agent deployment
+# Applies to the headlamp namespace
+
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: luna-agent-deploy
+  namespace: flux-system
+spec:
+  interval: 5m
+  path: ./deploy
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: luna-agent-source
+  targetNamespace: headlamp
+  postBuild:
+    substitute:
+      NAMESPACE: headlamp
+      REPLICAS: "2"
+      AI_PROVIDER: openai
+
+---
+# Kustomization for Flux Controllers
+
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: luna-agent-controllers
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./flux/controllers
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: luna-agent-source

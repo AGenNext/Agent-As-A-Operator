@@ -3,7 +3,7 @@
 > 🤖 Agents who can operate tools - Kubernetes, GitOps, and Cloud Native operations
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![ArgoCD](https://img.shields.io/badge/ArgoCD-EF7B4D?style=for-the-badge&logo=argo)](https://argoproj.github.io/)
+[![Flux CD](https://img.shields.io/badge/Flux_CD-1B5E20?style=for-the-badge&logo=git)](https://fluxcd.io/)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-326ce5?style=for-the-badge&logo=kubernetes)](https://kubernetes.io/)
 
 ## Overview
@@ -83,45 +83,62 @@ headlamp namespace
 | StackBuilder | `kubectl apply -f deploy/stack.yaml` | Full stack |
 | Helm | `helm install pod-manager oci://...` | Production |
 | Terraform | `terraform apply` | IaC |
-| ArgoCD | See [ArgoCD Sync](#argocd-sync) | GitOps |
+| Flux CD | See [Flux Sync](#flux-sync) | GitOps |
 
-## ArgoCD Sync
+## Flux CD Sync
 
-Sync Luna agent configuration across multiple repositories:
+Sync Luna agent configuration across multiple repositories using Flux CD:
 
 ```bash
-# Apply ArgoCD App-of-Apps
-kubectl apply -f argocd/app-of-apps.yaml
+# Install Flux on your cluster
+flux install --components=source-controller,kustomize-controller,helm-controller
 
-# Or deploy directly
-kubectl apply -f argocd/luna-app.yaml
+# Apply Flux configuration
+kubectl apply -f flux/
+
+# Check status
+flux get all
 ```
 
-### Multi-Repo Sync Architecture
+### Flux Multi-Repo Sync Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    ArgoCD                                  │
-│                  (Control Plane)                            │
+│                    Flux CD                                  │
+│              (GitOps Toolkit)                               │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  App-of-Apps ──────────────────────────────────────┐       │
-│       │                                           │       │
-│       ▼                                           ▼       │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐   │
-│  │ Agent-Services│   │ DevOps      │    │ Operator-  │   │
-│  │ AGENTS.md   │    │ AGENTS.md   │    │ Agents     │   │
-│  └─────────────┘    └─────────────┘    │ (source)   │   │
-│                                        └─────────────┘   │
-│                                             ▲             │
-│                                             │             │
-│                                     ┌───────────────┐    │
-│                                     │ headlamp-k8s/ │    │
-│                                     │ plugins       │    │
-│                                     └───────────────┘    │
+│  GitRepository ──────────────────────────────────────┐     │
+│  (Operator-Agents source)                             │     │
+│       │                                               │     │
+│       ├──► Kustomization (deploy) ──┐               │     │
+│       │                               ▼               │     │
+│       │                         headlamp namespace    │     │
+│       │                               │               │     │
+│       ├──► Kustomization (sync) ────▼─────────────────┼───►│
+│       │                               │               │     │
+│       │                    ┌───────────┴───────────┐  │     │
+│       │                    │                       │  │     │
+│       │                    ▼                       ▼  │     │
+│       │            ┌─────────────┐    ┌─────────────┐│     │
+│       │            │ Agent-Services│   │ DevOps      ││     │
+│       │            │ AGENTS.md   │    │ AGENTS.md   ││     │
+│       │            └─────────────┘    └─────────────┘│     │
+│       │                                               │     │
+│       └──► HelmRelease (pod-manager)                  │     │
+│                   (helm chart)                        │     │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+### Flux Components
+
+| Component | Purpose |
+|-----------|---------|
+| `flux/source.yaml` | GitRepository for source repo |
+| `flux/sync.yaml` | Kustomization for deployments |
+| `flux/repos.yaml` | Multi-repo sync configuration |
+| `flux/helm.yaml` | HelmRelease for pod-manager |
 
 ### Target Repositories
 
@@ -153,11 +170,12 @@ Operator-Agents/
 ├── e2e/
 │   ├── run-tests.sh                   # Bash E2E tests
 │   ├── main.tf                        # Terraform
-│   └── argocd-app.yaml               # ArgoCD app
-├── argocd/
-│   ├── app-of-apps.yaml              # App-of-Apps pattern
-│   ├── luna-app.yaml                # Luna agent app
-│   └── agents-app.yaml              # Multi-agent app
+│   └── flux-app.yaml                  # Flux sync test
+├── flux/
+│   ├── source.yaml              # GitRepository source
+│   ├── sync.yaml                # Kustomization + ImagePolicy
+│   ├── repos.yaml               # Multi-repo sync
+│   └── helm.yaml                # HelmRelease for pod-manager
 ├── Dockerfile                         # Container build
 └── requirements.txt                   # Python dependencies
 ```

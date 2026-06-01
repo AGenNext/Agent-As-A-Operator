@@ -1,4 +1,4 @@
-name: Sync Luna Agent to Multiple Repos
+name: Sync Luna Agent to Multiple Repos via Flux
 
 on:
   push:
@@ -9,6 +9,7 @@ on:
       - 'skills/**'
       - 'AGENT_CARD.md'
       - 'CARD.md'
+      - 'flux/**'
   workflow_dispatch:
 
 env:
