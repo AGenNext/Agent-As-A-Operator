@@ -1,0 +1,17 @@
+reconcile:
+  description: Execute reconciliation loop
+
+explain:
+  description: Explain current plan and reasoning
+
+audit:
+  description: Generate audit evidence
+
+approve:
+  description: Approve pending action
+
+rollback:
+  description: Rollback last successful action
+
+health:
+  description: Report runtime health
