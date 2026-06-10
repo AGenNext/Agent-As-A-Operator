@@ -1,0 +1,15 @@
+type: charm
+name: agent-operator
+summary: Intelligent Agent Operator Runtime
+description: |
+  Agent-As-A-Operator charm. It observes model state, evaluates policy,
+  produces explainable plans, and reconciles through governed actions.
+
+base: ubuntu@24.04
+platforms:
+  amd64:
+
+parts:
+  charm:
+    plugin: charm
+    source: .
